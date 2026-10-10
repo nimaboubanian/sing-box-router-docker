@@ -24,14 +24,18 @@ render_config() {
         def rset: {
             type: "remote",
             tag: (. | sub(".*[/@]"; "") | sub("\\.srs$"; "")),
-            format: "binary", url: ., download_detour: "proxy-out"
+            format: "binary", url: .
         };
         ($reject_urls | urls | map(rset)) as $ru
         | ($ddomain_urls | urls | map(rset)) as $du
         | ($dip_urls | urls | map(rset)) as $iu
         | {
             log: {level: $lvl},
-            dns: {servers: [{type: "https", tag: "doh", server: $doh, detour: "proxy-out"}]},
+            http_clients: [{tag: "dl-via-proxy", detour: "proxy-out"}],
+            dns: {servers: [
+                {type: "local", tag: "dns-local"},
+                {type: "https", tag: "doh", server: $doh, detour: "proxy-out"}
+            ]},
             inbounds: [{
                 type: "mixed", tag: "mixed-in",
                 listen: "::", listen_port: ($listen_port | tonumber)
@@ -42,6 +46,8 @@ render_config() {
                  server: $proxy_host, server_port: ($proxy_port | tonumber)}
             ],
             route: {
+                default_domain_resolver: "dns-local",
+                default_http_client: "dl-via-proxy",
                 rules: (
                     [{action: "sniff"}]
                     + (if ($ru | length) > 0

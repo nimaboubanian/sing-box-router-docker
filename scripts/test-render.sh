@@ -31,13 +31,18 @@ assert "case1 defaults" "$out" '
     .inbounds[0].listen_port == 1070
     and (.outbounds | map(.tag)) == ["direct-out", "proxy-out"]
     and (.outbounds[] | select(.tag == "proxy-out") | .server == "lb" and .server_port == 1081)
-    and .dns.servers[0] == {type: "https", tag: "doh", server: "1.1.1.1", detour: "proxy-out"}
+    and .dns.servers[0] == {type: "local", tag: "dns-local"}
+    and .dns.servers[1] == {type: "https", tag: "doh", server: "1.1.1.1", detour: "proxy-out"}
+    and .route.default_domain_resolver == "dns-local"
     and .route.final == "proxy-out"
     and (.route.rules | map(.action // .outbound)) == ["sniff", "reject", "direct-out", "direct-out", "resolve", "direct-out"]
     and .route.rules[2].ip_is_private == true
     and .route.rules[1].rule_set == ["geosite-category-ads-all", "geosite-malware", "geosite-phishing", "geosite-cryptominers"]
     and (.route.rule_set | length) == 6
-    and all(.route.rule_set[]; .download_detour == "proxy-out" and .format == "binary")
+    and all(.route.rule_set[]; .format == "binary")
+    and (.route.rule_set | map(has("download_detour")) | any | not)
+    and .http_clients == [{tag: "dl-via-proxy", detour: "proxy-out"}]
+    and .route.default_http_client == "dl-via-proxy"
 '
 
 # Case 2: empty DIRECT_IP_RULESET_URLS — omit rule and rule_sets, keep resolve
