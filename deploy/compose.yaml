@@ -1,0 +1,31 @@
+networks:
+  vpndogs: { name: vpndogs }
+
+services:
+  router:
+    image: nimaboubanian/sing-box-router:latest
+    container_name: sb-router
+    networks: [vpndogs]
+    ports:
+      - "127.0.0.1:1070:1070"
+    environment:
+      LISTEN_PORT: ${LISTEN_PORT:-1070}
+      PROXY_HOST: ${PROXY_HOST:-lb}
+      PROXY_PORT: ${PROXY_PORT:-1081}
+      REJECT_RULESET_URLS: ${REJECT_RULESET_URLS-https://raw.githubusercontent.com/Chocolate4U/Iran-sing-box-rules/rule-set/geosite-category-ads-all.srs,https://raw.githubusercontent.com/Chocolate4U/Iran-sing-box-rules/rule-set/geosite-malware.srs,https://raw.githubusercontent.com/Chocolate4U/Iran-sing-box-rules/rule-set/geosite-phishing.srs,https://raw.githubusercontent.com/Chocolate4U/Iran-sing-box-rules/rule-set/geosite-cryptominers.srs}
+      DIRECT_DOMAIN_RULESET_URLS: ${DIRECT_DOMAIN_RULESET_URLS-https://raw.githubusercontent.com/Chocolate4U/Iran-sing-box-rules/rule-set/geosite-ir.srs}
+      DIRECT_IP_RULESET_URLS: ${DIRECT_IP_RULESET_URLS-https://raw.githubusercontent.com/Chocolate4U/Iran-sing-box-rules/rule-set/geoip-ir.srs}
+      DOH_SERVER: ${DOH_SERVER:-1.1.1.1}
+      LOG_LEVEL: ${LOG_LEVEL:-warn}
+      EXTRA_DIRECT_DOMAINS: ${EXTRA_DIRECT_DOMAINS:-}
+      EXTRA_DIRECT_IPS: ${EXTRA_DIRECT_IPS:-}
+      EXTRA_REJECT_DOMAINS: ${EXTRA_REJECT_DOMAINS:-}
+      EXTRA_REJECT_IPS: ${EXTRA_REJECT_IPS:-}
+      EXTRA_PROXY_DOMAINS: ${EXTRA_PROXY_DOMAINS:-}
+      EXTRA_PROXY_IPS: ${EXTRA_PROXY_IPS:-}
+    volumes:
+      - sb-router-cache:/var/lib/sing-box
+    restart: unless-stopped
+
+volumes:
+  sb-router-cache: {}

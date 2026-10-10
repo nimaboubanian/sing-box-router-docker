@@ -82,6 +82,19 @@ duplicate tag makes `sing-box check` fail at startup. Use an IP (not a hostname)
 `./build.sh` uses buildx on the host network. If GitHub is unreachable directly, route the
 build through a proxy: `BUILD_PROXY=socks5://127.0.0.1:1081 ./build.sh`.
 
+## Deploy from prebuilt images
+
+Every push to `main` (and every `v*` tag) publishes `linux/amd64` + `linux/arm64` images to
+[ghcr.io/nimaboubanian/sing-box-router](https://github.com/nimaboubanian/sing-box-router-docker/pkgs/container/sing-box-router)
+and [Docker Hub](https://hub.docker.com/r/nimaboubanian/sing-box-router) via GitHub Actions.
+Requires `sb-lb` on the `vpndogs` network (see [sing-box-client-docker](https://github.com/nimaboubanian/sing-box-client-docker)).
+
+```bash
+docker compose -f deploy/compose.yaml up -d
+curl --proxy socks5h://127.0.0.1:1070 https://api.ipify.org   # proxied
+curl --proxy socks5h://127.0.0.1:1070 https://api.ipmyp.ir    # direct
+```
+
 ## Testing
 
 ```bash
