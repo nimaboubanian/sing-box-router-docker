@@ -19,12 +19,21 @@ detour — `raw.githubusercontent.com` is unreliable from Iranian networks. DNS 
 ## Routing decision order
 
 1. `sniff` — recover the domain from TLS SNI / HTTP Host for IP-connecting clients
-2. ads/malware/phishing/cryptominers → `reject`
-3. private IPs → `direct`
-4. `geosite-ir` (`.ir` TLD + known Iranian domains) → `direct`
-5. `resolve` remaining domains via DoH (proxy detour)
-6. `geoip-ir` (Iranian IPs, incl. Iranian CDN/messenger ranges) → `direct`
-7. `final` → `proxy-out` (SOCKS to `lb:1081`)
+2. ads/malware/phishing/cryptominers rule-sets → `reject`
+3. `EXTRA_REJECT_DOMAINS` → block
+4. `EXTRA_PROXY_DOMAINS` → proxy (overrides everything direct below)
+5. `EXTRA_REJECT_IPS` / `EXTRA_PROXY_IPS` → block/proxy for IP-connecting clients
+6. private IPs → `direct`
+7. `geosite-ir` (`.ir` TLD + known Iranian domains) → `direct`
+8. `EXTRA_DIRECT_DOMAINS` → direct
+9. `resolve` remaining domains via DoH (proxy detour)
+10. `EXTRA_REJECT_IPS` / `EXTRA_PROXY_IPS` again — step 5's IP rules only saw IP-connecting clients; rule-sets and resolved domains are re-matched here (`EXTRA_PROXY_IPS` still overrides `geoip-ir`)
+11. `geoip-ir` (Iranian IPs, incl. Iranian CDN/messenger ranges) → `direct`
+12. `EXTRA_DIRECT_IPS` → direct
+13. `final` → `proxy-out` (SOCKS to `lb:1081`)
+
+If a destination appears in several `EXTRA_*` lists, the fixed rule order means
+**reject > proxy > direct** — the first matching rule wins.
 
 ## Usage
 
@@ -51,6 +60,10 @@ All knobs are environment variables (see `.env.example`; copy to `.env` to overr
 | `DIRECT_DOMAIN_RULESET_URLS` | `geosite-ir.srs` | Comma-separated, matched before resolve |
 | `DIRECT_IP_RULESET_URLS` | `geoip-ir.srs` | Comma-separated, matched after resolve |
 | `DOH_SERVER` | `1.1.1.1` | DoH endpoint for the resolve step (detoured via proxy) |
+| `EXTRA_REJECT_DOMAINS` / `EXTRA_REJECT_IPS` | *(empty)* | Raw destinations to block, comma-separated |
+| `EXTRA_PROXY_DOMAINS` / `EXTRA_PROXY_IPS` | *(empty)* | Raw destinations forced through the proxy — overrides the direct rule-sets |
+| `EXTRA_DIRECT_DOMAINS` | *(empty)* | Raw domains routed direct, comma-separated, matched before resolve |
+| `EXTRA_DIRECT_IPS` | *(empty)* | Raw IPs/CIDRs routed direct, comma-separated |
 | `LOG_LEVEL` | `warn` | Use `info` to see route decisions |
 
 Rule-set tags derive from URL basenames, so jsDelivr equivalents
@@ -59,6 +72,10 @@ work as drop-in replacements.
 
 Setting a `*_RULESET_URLS` var to **empty disables that group** — the route rule and its
 rule-set definitions are omitted from the config.
+
+Don't put the same rule-set URL in two lists — tags derive from the URL basename, and a
+duplicate tag makes `sing-box check` fail at startup. Use an IP (not a hostname) for
+`DOH_SERVER`: a hostname would be resolved through the local (Iranian) DNS.
 
 ## Build
 

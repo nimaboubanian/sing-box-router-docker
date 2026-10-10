@@ -14,13 +14,12 @@ render() { # render [KEY=VAL ...] -> rendered config JSON on stdout (exit status
 }
 
 assert() { # name json jq-filter
-    local name="$1" json="$2" filter="$3"
-    if printf '%s' "$json" | jq -e "$filter" >/dev/null 2>&1; then
+    local name="$1" json="$2" filter="$3" res
+    if res="$(printf '%s' "$json" | jq -e "$filter" 2>&1)"; then
         echo "$name: PASS"
     else
         echo "$name: FAIL"
-        printf '%s' "$json" | jq -e "$filter" >/dev/null 2>&1 || \
-            printf '%s' "$json" | jq "$filter" >&2 || true
+        printf '%s\n' "$res" >&2
         fail=1
     fi
 }
@@ -74,6 +73,34 @@ assert "case5 compose empty-to-disable" "$cfg" '
     .services.router.environment.DIRECT_IP_RULESET_URLS == ""
     and (.services.router.environment.DIRECT_DOMAIN_RULESET_URLS | test("geosite-ir\\.srs$"))
     and (.services.router.environment.LISTEN_PORT | tonumber) == 1070
+'
+
+# Case 6: extra raw direct destinations — domain before resolve, IP after
+out="$(render EXTRA_DIRECT_DOMAINS=' example.com, foo.org ' EXTRA_DIRECT_IPS='10.8.0.0/24')"
+assert "case6 extra destinations" "$out" '
+    any(.route.rules[]; .domain_suffix == ["example.com", "foo.org"] and .outbound == "direct-out")
+    and any(.route.rules[]; .ip_cidr == ["10.8.0.0/24"] and .outbound == "direct-out")
+    and (([.route.rules[] | has("domain_suffix")] | index(true))
+         < ([.route.rules[] | .action] | index("resolve")))
+    and (([.route.rules[] | has("ip_cidr")] | index(true))
+         > ([.route.rules[] | .action] | index("resolve")))
+'
+
+# Case 7: reject/proxy extras — priority reject > proxy > direct (first match wins).
+# IP extras are rendered twice (pre-private + post-resolve) so both IP-connected
+# and domain-connected (resolved) clients honor them.
+out="$(render EXTRA_REJECT_DOMAINS=bad.example EXTRA_PROXY_DOMAINS=bank.example.ir EXTRA_PROXY_IPS=10.10.0.0/24 EXTRA_REJECT_IPS=10.9.0.0/24 EXTRA_DIRECT_DOMAINS=bank.example.ir,bad.example)"
+assert "case7 extra reject/proxy priority" "$out" '
+    any(.route.rules[]; .domain_suffix == ["bad.example"] and .action == "reject")
+    and any(.route.rules[]; .domain_suffix == ["bank.example.ir"] and .outbound == "proxy-out")
+    and any(.route.rules[]; .domain_suffix == ["bank.example.ir", "bad.example"] and .outbound == "direct-out")
+    and (.route.rules | map(select(.domain_suffix)) | map(.action // .outbound))
+        == ["reject", "proxy-out", "direct-out"]
+    and (([.route.rules[] | has("ip_cidr")] | indices(true)) as $i
+         | ([.route.rules[] | .ip_is_private] | index(true)) as $p
+         | ([.route.rules[] | .action] | index("resolve")) as $r
+         | ($i | length) == 4
+         and $i[0] < $p and $i[1] < $p and $r < $i[2] and $r < $i[3])
 '
 
 exit "$fail"

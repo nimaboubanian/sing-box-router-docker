@@ -19,6 +19,12 @@ render_config() {
         --arg dip_urls "${DIRECT_IP_RULESET_URLS-$DIRECT_IP_RULESET_URLS_DEFAULT}" \
         --arg doh "${DOH_SERVER:-1.1.1.1}" \
         --arg lvl "${LOG_LEVEL:-warn}" \
+        --arg extra_domains "${EXTRA_DIRECT_DOMAINS-}" \
+        --arg extra_ips "${EXTRA_DIRECT_IPS-}" \
+        --arg xrej_d "${EXTRA_REJECT_DOMAINS-}" \
+        --arg xrej_i "${EXTRA_REJECT_IPS-}" \
+        --arg xprox_d "${EXTRA_PROXY_DOMAINS-}" \
+        --arg xprox_i "${EXTRA_PROXY_IPS-}" \
         '
         def urls: split(",") | map(gsub("^\\s+|\\s+$"; "")) | map(select(length > 0));
         def rset: {
@@ -26,6 +32,13 @@ render_config() {
             tag: (. | sub(".*[/@]"; "") | sub("\\.srs$"; "")),
             format: "binary", url: .
         };
+        # extra(raw_csv; match_key; effect) — raw destinations -> one route rule.
+        # effect is {action:"reject"} or {outbound:"direct-out"/"proxy-out"}.
+        # Rule order below fixes priority: reject > proxy > direct.
+        def extra($vals; $match; $effect):
+            if ($vals | urls | length) > 0
+            then [{($match): ($vals | urls)} + $effect]
+            else [] end;
         ($reject_urls | urls | map(rset)) as $ru
         | ($ddomain_urls | urls | map(rset)) as $du
         | ($dip_urls | urls | map(rset)) as $iu
@@ -52,12 +65,23 @@ render_config() {
                     [{action: "sniff"}]
                     + (if ($ru | length) > 0
                        then [{rule_set: [$ru[].tag], action: "reject"}] else [] end)
+                    + extra($xrej_d; "domain_suffix"; {action: "reject"})
+                    + extra($xprox_d; "domain_suffix"; {outbound: "proxy-out"})
+                    + extra($xrej_i; "ip_cidr"; {action: "reject"})
+                    + extra($xprox_i; "ip_cidr"; {outbound: "proxy-out"})
                     + [{ip_is_private: true, outbound: "direct-out"}]
                     + (if ($du | length) > 0
                        then [{rule_set: [$du[].tag], outbound: "direct-out"}] else [] end)
+                    + extra($extra_domains; "domain_suffix"; {outbound: "direct-out"})
                     + [{action: "resolve", server: "doh"}]
+                    # IP extras repeated post-resolve: bare ip rules before resolve
+                    # are only seen by IP-connecting clients; domain-connected clients
+                    # are re-matched here (reject/proxy still override geoip-ir).
+                    + extra($xrej_i; "ip_cidr"; {action: "reject"})
+                    + extra($xprox_i; "ip_cidr"; {outbound: "proxy-out"})
                     + (if ($iu | length) > 0
                        then [{rule_set: [$iu[].tag], outbound: "direct-out"}] else [] end)
+                    + extra($extra_ips; "ip_cidr"; {outbound: "direct-out"})
                 ),
                 rule_set: ($ru + $du + $iu),
                 final: "proxy-out"

@@ -18,6 +18,12 @@ services:
       DIRECT_IP_RULESET_URLS: ${DIRECT_IP_RULESET_URLS-https://raw.githubusercontent.com/Chocolate4U/Iran-sing-box-rules/rule-set/geoip-ir.srs}
       DOH_SERVER: ${DOH_SERVER:-1.1.1.1}
       LOG_LEVEL: ${LOG_LEVEL:-warn}
+      EXTRA_DIRECT_DOMAINS: ${EXTRA_DIRECT_DOMAINS:-}
+      EXTRA_DIRECT_IPS: ${EXTRA_DIRECT_IPS:-}
+      EXTRA_REJECT_DOMAINS: ${EXTRA_REJECT_DOMAINS:-}
+      EXTRA_REJECT_IPS: ${EXTRA_REJECT_IPS:-}
+      EXTRA_PROXY_DOMAINS: ${EXTRA_PROXY_DOMAINS:-}
+      EXTRA_PROXY_IPS: ${EXTRA_PROXY_IPS:-}
     volumes:
       - sb-router-cache:/var/lib/sing-box
     restart: unless-stopped
