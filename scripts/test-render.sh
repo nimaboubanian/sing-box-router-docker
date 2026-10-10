@@ -68,4 +68,12 @@ assert "case4 overrides" "$out" '
     and (.outbounds[] | select(.tag == "proxy-out") | .server == "1.2.3.4" and .server_port == 9)
 '
 
+# Case 5: compose interpolation honors empty (disable) over defaults
+cfg="$(DIRECT_IP_RULESET_URLS= docker compose config --format json 2>/dev/null)" || true
+assert "case5 compose empty-to-disable" "$cfg" '
+    .services.router.environment.DIRECT_IP_RULESET_URLS == ""
+    and (.services.router.environment.DIRECT_DOMAIN_RULESET_URLS | test("geosite-ir\\.srs$"))
+    and (.services.router.environment.LISTEN_PORT | tonumber) == 1070
+'
+
 exit "$fail"

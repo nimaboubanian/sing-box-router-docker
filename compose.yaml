@@ -13,9 +13,9 @@ services:
       LISTEN_PORT: ${LISTEN_PORT:-1070}
       PROXY_HOST: ${PROXY_HOST:-lb}
       PROXY_PORT: ${PROXY_PORT:-1081}
-      REJECT_RULESET_URLS: ${REJECT_RULESET_URLS:-https://raw.githubusercontent.com/Chocolate4U/Iran-sing-box-rules/rule-set/geosite-category-ads-all.srs,https://raw.githubusercontent.com/Chocolate4U/Iran-sing-box-rules/rule-set/geosite-malware.srs,https://raw.githubusercontent.com/Chocolate4U/Iran-sing-box-rules/rule-set/geosite-phishing.srs,https://raw.githubusercontent.com/Chocolate4U/Iran-sing-box-rules/rule-set/geosite-cryptominers.srs}
-      DIRECT_DOMAIN_RULESET_URLS: ${DIRECT_DOMAIN_RULESET_URLS:-https://raw.githubusercontent.com/Chocolate4U/Iran-sing-box-rules/rule-set/geosite-ir.srs}
-      DIRECT_IP_RULESET_URLS: ${DIRECT_IP_RULESET_URLS:-https://raw.githubusercontent.com/Chocolate4U/Iran-sing-box-rules/rule-set/geoip-ir.srs}
+      REJECT_RULESET_URLS: ${REJECT_RULESET_URLS-https://raw.githubusercontent.com/Chocolate4U/Iran-sing-box-rules/rule-set/geosite-category-ads-all.srs,https://raw.githubusercontent.com/Chocolate4U/Iran-sing-box-rules/rule-set/geosite-malware.srs,https://raw.githubusercontent.com/Chocolate4U/Iran-sing-box-rules/rule-set/geosite-phishing.srs,https://raw.githubusercontent.com/Chocolate4U/Iran-sing-box-rules/rule-set/geosite-cryptominers.srs}
+      DIRECT_DOMAIN_RULESET_URLS: ${DIRECT_DOMAIN_RULESET_URLS-https://raw.githubusercontent.com/Chocolate4U/Iran-sing-box-rules/rule-set/geosite-ir.srs}
+      DIRECT_IP_RULESET_URLS: ${DIRECT_IP_RULESET_URLS-https://raw.githubusercontent.com/Chocolate4U/Iran-sing-box-rules/rule-set/geoip-ir.srs}
       DOH_SERVER: ${DOH_SERVER:-1.1.1.1}
       LOG_LEVEL: ${LOG_LEVEL:-warn}
     volumes:
