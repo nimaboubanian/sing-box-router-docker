@@ -16,6 +16,7 @@ services:
       REJECT_RULESET_URLS: ${REJECT_RULESET_URLS-https://raw.githubusercontent.com/Chocolate4U/Iran-sing-box-rules/rule-set/geosite-category-ads-all.srs,https://raw.githubusercontent.com/Chocolate4U/Iran-sing-box-rules/rule-set/geosite-malware.srs,https://raw.githubusercontent.com/Chocolate4U/Iran-sing-box-rules/rule-set/geosite-phishing.srs,https://raw.githubusercontent.com/Chocolate4U/Iran-sing-box-rules/rule-set/geosite-cryptominers.srs}
       DIRECT_DOMAIN_RULESET_URLS: ${DIRECT_DOMAIN_RULESET_URLS-https://raw.githubusercontent.com/Chocolate4U/Iran-sing-box-rules/rule-set/geosite-ir.srs}
       DIRECT_IP_RULESET_URLS: ${DIRECT_IP_RULESET_URLS-https://raw.githubusercontent.com/Chocolate4U/Iran-sing-box-rules/rule-set/geoip-ir.srs}
+      RULESET_MIRRORS: ${RULESET_MIRRORS:-}
       DOH_SERVER: ${DOH_SERVER:-1.1.1.1}
       LOG_LEVEL: ${LOG_LEVEL:-warn}
       EXTRA_DIRECT_DOMAINS: ${EXTRA_DIRECT_DOMAINS:-}

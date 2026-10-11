@@ -18,4 +18,11 @@ RUN set -eux; \
 
 COPY --chmod=755 scripts /usr/local/bin
 
+# Bake the rule-sets in so the container boots with no network at all. Same
+# fetch path the entrypoint uses (retry -> jsDelivr mirror -> validate).
+# SEED is a cache-buster, not data: without it the GHA cache reuses this layer
+# forever and the scheduled rebuild ships the same stale rule-sets.
+ARG SEED=""
+RUN : "$SEED" && RULESET_DIR=/usr/local/share/sing-box/rulesets entrypoint.sh fetch-rulesets
+
 ENTRYPOINT ["/sbin/tini", "--", "/usr/local/bin/entrypoint.sh"]

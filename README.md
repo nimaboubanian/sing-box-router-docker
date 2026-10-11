@@ -11,10 +11,27 @@ Egress: three paths.
 | Private/LAN IPs, Iranian domains and IPs | **Direct** (host's default route) |
 | Everything else | **Proxy** (existing `sb-lb` haproxy on the `vpndogs` network) |
 
-Rule-sets are fetched at startup from [Chocolate4U/Iran-sing-box-rules](https://github.com/Chocolate4U/Iran-sing-box-rules)
-(Iran-curated lists), cached in a named volume so restarts don't refetch, and downloaded through the proxy
-detour — `raw.githubusercontent.com` is unreliable from Iranian networks. DNS for the routing decision
-(`resolve` before geoip matching) goes through DoH (`1.1.1.1`) via the proxy; nothing local sees it.
+Rule-sets come from [Chocolate4U/Iran-sing-box-rules](https://github.com/Chocolate4U/Iran-sing-box-rules)
+(Iran-curated lists) and are **baked into the image at build time** under
+`/usr/local/share/sing-box/rulesets`. At boot the entrypoint copies each one into
+`/var/lib/sing-box/rulesets` after validating it, so **starting the container needs no network at
+all** — not even to reach GitHub. `raw.githubusercontent.com` is unreliable from Iranian networks,
+which is why the build falls back to `cdn.jsdelivr.net` (and `RULESET_MIRRORS`) before it gives up.
+
+Only rule-sets with **no seed and no cached copy** — i.e. custom `*_RULESET_URLS` — are fetched at
+boot, with retries, mirror fallback, and a `sing-box rule-set decompile` parse gate. A rule-set that
+is truncated or empty is rejected rather than installed, since a silently-empty rule-set matches
+nothing and sends all traffic to the proxy. If nothing valid can be had, the container exits
+non-zero so compose's backoff retries it, rather than booting a router whose `reject`/direct
+rule-sets are missing. A rule-set already in the volume that still parses is reused as-is.
+
+**Freshness = image age.** CI rebuilds weekly (Mondays 04:00 UTC) so `latest` always carries current
+lists; `docker compose pull && docker compose up -d` picks them up. Note GitHub disables scheduled
+workflows after 60 days of repo inactivity — if the weekly run stops appearing, re-enable it in the
+Actions tab or run `publish` manually via `workflow_dispatch`.
+
+DNS for the routing decision (`resolve` before geoip matching) goes through DoH (`1.1.1.1`) via the
+proxy; nothing local sees it.
 
 ## Routing decision order
 
@@ -39,7 +56,7 @@ If a destination appears in several `EXTRA_*` lists, the fixed rule order means
 
 ```bash
 ./build.sh                 # or: BUILD_PROXY=socks5://127.0.0.1:1081 ./build.sh
-docker compose up -d       # requires sb-lb to be up on vpndogs (rule-set downloads detour through it)
+docker compose up -d       # requires sb-lb to be up on vpndogs (non-Iranian traffic is sent to it)
 
 curl --proxy socks5h://127.0.0.1:1070 https://api.ipify.org   # foreign → proxied
 curl --proxy socks5h://127.0.0.1:1070 https://api.ipmyp.ir    # Iranian → direct
@@ -59,6 +76,7 @@ All knobs are environment variables (see `.env.example`; copy to `.env` to overr
 | `REJECT_RULESET_URLS` | ads/malware/phishing/cryptominers `.srs` URLs | Comma-separated |
 | `DIRECT_DOMAIN_RULESET_URLS` | `geosite-ir.srs` | Comma-separated, matched before resolve |
 | `DIRECT_IP_RULESET_URLS` | `geoip-ir.srs` | Comma-separated, matched after resolve |
+| `RULESET_MIRRORS` | *(empty)* | Extra comma-separated rule-set sources tried after the URL's own jsDelivr mirror; `@file@` is replaced with the URL basename |
 | `DOH_SERVER` | `1.1.1.1` | DoH endpoint for the resolve step (detoured via proxy) |
 | `EXTRA_REJECT_DOMAINS` / `EXTRA_REJECT_IPS` | *(empty)* | Raw destinations to block, comma-separated |
 | `EXTRA_PROXY_DOMAINS` / `EXTRA_PROXY_IPS` | *(empty)* | Raw destinations forced through the proxy — overrides the direct rule-sets |
@@ -68,7 +86,8 @@ All knobs are environment variables (see `.env.example`; copy to `.env` to overr
 
 Rule-set tags derive from URL basenames, so jsDelivr equivalents
 (`https://cdn.jsdelivr.net/gh/chocolate4u/Iran-sing-box-rules@rule-set/<name>.srs`)
-work as drop-in replacements.
+work as drop-in replacements. Fetched rule-sets are stored as `<tag>.srs` under
+`/var/lib/sing-box/rulesets`, which the compose volume already persists.
 
 Setting a `*_RULESET_URLS` var to **empty disables that group** — the route rule and its
 rule-set definitions are omitted from the config.
@@ -98,8 +117,10 @@ curl --proxy socks5h://127.0.0.1:1070 https://api.ipmyp.ir    # direct
 ## Testing
 
 ```bash
-scripts/test-render.sh   # 5 contract tests for the rendered config (run in the image)
+scripts/test-render.sh   # contract tests for render + fetch-rulesets (run in the image)
 ```
 
-The container validates its rendered config with `sing-box check` before starting; a bad
-config exits non-zero and docker's `restart: unless-stopped` backoff surfaces it in logs.
+Every case runs the container with `--network none` and fetches rule-sets over `file://`
+URLs, so the suite is network-free. The container validates its rendered config with
+`sing-box check` before starting; a bad config — or a rule-set that could not be fetched —
+exits non-zero and docker's `restart: unless-stopped` backoff surfaces it in logs.
