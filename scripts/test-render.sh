@@ -265,4 +265,21 @@ eq "case16 image ships the default seed" \
         geosite-malware geosite-phishing geoip-ir | sort)" \
     "$(seed_tags)"
 
+# Case 17: the seed must win over a valid-but-stale copy already in the volume.
+# Without this the weekly rebuild changes nothing: every boot after the first
+# would reuse the volume copy and the deployment would freeze on its day-one lists.
+STALE_FIXTURES='
+mkdir -p /seed /rulesets
+printf "{\"version\":3,\"rules\":[{\"domain_suffix\":[\".stale.example\"]}]}" > /tmp/stale.json
+printf "{\"version\":3,\"rules\":[{\"domain_suffix\":[\".fresh.example\"]}]}" > /tmp/fresh.json
+sing-box rule-set compile /tmp/stale.json -o /rulesets/ads.srs
+sing-box rule-set compile /tmp/fresh.json -o /seed/ads.srs
+'
+exit_is "case17 seed overrides stale volume copy" 0 \
+    docker_run -e RULESET_DIR=/rulesets -e SEED_DIR=/seed \
+        -e DIRECT_DOMAIN_RULESET_URLS= -e DIRECT_IP_RULESET_URLS= \
+        -e REJECT_RULESET_URLS=file:///nonexistent/ads.srs \
+        --entrypoint /bin/sh "$IMG" -c "$STALE_FIXTURES"'/usr/local/bin/entrypoint.sh fetch-rulesets && sing-box rule-set decompile /rulesets/ads.srs -o /tmp/after.json && grep -q fresh.example /tmp/after.json && ! grep -q stale.example /tmp/after.json && echo SEED_WINS'
+has "case17 seed reapplied over volume copy" "seeding" "$LAST_OUT"
+
 exit "$fail"

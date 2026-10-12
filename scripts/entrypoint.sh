@@ -134,18 +134,15 @@ valid_rule_set() {
     fi
 }
 
-# 0 = a usable file landed at $RULESET_DIR/<tag>.srs. A rule-set already on
-# disk — or baked into the image — counts as usable, so a boot never depends on
-# the network. Only tags with no seed and no cached copy go out to the network.
+# 0 = a usable file landed at $RULESET_DIR/<tag>.srs. The image's seed wins: it
+# is what the weekly rebuild refreshed, and a file persisted in the volume must
+# not pin the deployment to whatever lists it happened to boot with. The volume
+# copy is the fallback for tags the image doesn't ship.
 fetch_rule_set() {
     local url="$1" tag dest seed src
     tag="$(tag_of "$url")"
     dest="$RULESET_DIR/$tag.srs"
     seed="$SEED_DIR/$tag.srs"
-    if valid_rule_set "$dest"; then
-        log "ruleset $tag: reusing $(wc -c <"$dest") bytes already on disk"
-        return 0
-    fi
     if valid_rule_set "$seed"; then
         log "ruleset $tag: seeding $(wc -c <"$seed") bytes from image"
         if cp "$seed" "$dest" && valid_rule_set "$dest"; then
@@ -153,6 +150,9 @@ fetch_rule_set() {
         fi
         log "ruleset $tag: seed unusable after copy, falling back to fetch"
         rm -f "$dest"
+    elif valid_rule_set "$dest"; then
+        log "ruleset $tag: reusing $(wc -c <"$dest") bytes already on disk"
+        return 0
     fi
     rm -f "$dest"
     while IFS= read -r src; do
